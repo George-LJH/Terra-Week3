@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyScript Appwrite</title>
+    
+    <!-- PyScript CSS and JS -->
+      <link rel="stylesheet" href="https://pyscript.net/releases/2026.3.1/core.css">
+      <script type="module" src="https://pyscript.net/releases/2026.3.1/core.js"></script>
+    <script src="https://unpkg.com/panic-overlay"></script>
+    <!-- Configure PyScript to install Appwrite from PyPI -->
+    <script type="py">
+    <py-config>
+        packages = ["appwrite>=27.0.0"]
+    </py-config>
+    </script>
+</head>
+<body>
+
+    <h1>Appwrite + PyScript Integration</h1>
+    <div id="output">Initializing Appwrite connection...</div>
+
+    <!-- 3. Write your PyScript App -->
+    <script type="py">
+        # Import the window object from JavaScript to access the Appwrite global variable
+        from js import Appwrite, document
+        import asyncio
+
+        async def main():
+            output_div = document.getElementById("output")
+            
+            try:
+                # Initialize the Appwrite Client
+                client = Appwrite.Client.new()
+                
+                # Configure your endpoint and project ID
+                client.setEndpoint('https://nyc.cloud.appwrite.io/v1') 
+                client.setProject('6aea07360010637cc48c') # <--- Replace with your project ID
+                
+                # Initialize Appwrite Databases service
+                databases = Appwrite.Databases.new(client)
+                
+                # Appwrite functions return JavaScript Promises. 
+                # We can await them directly in PyScript!
+                result = await databases.createDocument(
+                    'YOUR_DATABASE_ID',   # <--- Replace with your database ID
+                    'YOUR_COLLECTION_ID', # <--- Replace with your collection ID
+                    'unique()',           # Document ID (generates a unique ID)
+                    {
+                        "title": "Hello from PyScript!",
+                        "status": "Success"
+                    }
+                )
+                
+                output_div.innerText = f"Document created successfully! ID: {result.$id}"
+                
+            except Exception as e:
+                output_div.innerText = f"An error occurred: {str(e)}"
+
+        # Run the async main function
+        asyncio.ensure_future(main())
+    </script>
+
+</body>
+</html>
+
