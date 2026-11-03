@@ -9,12 +9,7 @@
       <link rel="stylesheet" href="https://pyscript.net/releases/2026.3.1/core.css">
       <script type="module" src="https://pyscript.net/releases/2026.3.1/core.js"></script>
     <script src="https://unpkg.com/panic-overlay"></script>
-    <!-- Configure PyScript to install Appwrite from PyPI -->
-    <script type="py">
-    <py-config>
-        packages = ["appwrite>=27.0.0"]
-    </py-config>
-    </script>
+        <script src="https://cdn.jsdelivr.net/npm/appwrite@17.0.0"></script>
 </head>
 <body>
 
@@ -31,7 +26,7 @@
             output_div = document.getElementById("output")
             
             try:
-                # Initialize the Appwrite Client
+                # Initialize the Appwrite JavaScript SDK client
                 client = Appwrite.Client.new()
                 
                 # Configure your endpoint and project ID
@@ -46,14 +41,14 @@
                 result = await databases.createDocument(
                     'YOUR_DATABASE_ID',   # <--- Replace with your database ID
                     'YOUR_COLLECTION_ID', # <--- Replace with your collection ID
-                    'unique()',           # Document ID (generates a unique ID)
+                    Appwrite.ID.unique(), # Document ID (generates a unique ID)
                     {
                         "title": "Hello from PyScript!",
                         "status": "Success"
                     }
                 )
                 
-                output_div.innerText = f"Document created successfully! ID: {result.$id}"
+                output_div.innerText = f"Document created successfully! ID: {result['$id']}"
                 
             except Exception as e:
                 output_div.innerText = f"An error occurred: {str(e)}"
