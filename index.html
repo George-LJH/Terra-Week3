@@ -39,8 +39,8 @@
                 # Appwrite functions return JavaScript Promises. 
                 # We can await them directly in PyScript!
                 result = await databases.createDocument(
-                    'YOUR_DATABASE_ID',   # <--- Replace with your database ID
-                    'YOUR_COLLECTION_ID', # <--- Replace with your collection ID
+                    '6aea09d400322e24d4eb',   # <--- Replace with your database ID
+                    '6aea09e00033b65b0b38', # <--- Replace with your collection ID
                     Appwrite.ID.unique(), # Document ID (generates a unique ID)
                     {
                         "title": "Hello from PyScript!",
