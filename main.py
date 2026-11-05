@@ -1,10 +1,33 @@
 import streamlit as st
-import supabase
-import httpx
-supabaseClient = supabase.create_client(
-    "https://bfjiwafmysriugxmnmbr.supabase.co",
-    "sb_publishable_cAFsSAfXjaeC_JSc0527Rw_I2sPNefR"
-)
+import asyncio
+import json
+from pyodide.http import pyfetch
+
+SUPABASE_URL = "https://bfjiwafmysriugxmnmbr.supabase.co"
+SUPABASE_KEY = "sb_publishable_cAFsSAfXjaeC_JSc0527Rw_I2sPNefR"
+
+
+async def supabase_request(path, method="GET", body=None, access_token=None):
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Content-Type": "application/json",
+    }
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+
+    response = await pyfetch(
+        f"{SUPABASE_URL}{path}",
+        method=method,
+        headers=headers,
+        body=json.dumps(body) if body is not None else None,
+    )
+    response_body = await response.string()
+    return response.status, json.loads(response_body) if response_body else {}
+
+
+def request_supabase(path, method="GET", body=None, access_token=None):
+    return asyncio.run(supabase_request(path, method, body, access_token))
+
 with st.form("signup_form"):
     email = st.text_input("Enter your email")
     password = st.text_input("Enter your password", type="password")
@@ -15,23 +38,21 @@ if submitted:
         st.error("Enter an email and password.")
     else:
         try:
-            response = supabaseClient.auth.sign_up({
-                "email": email.strip(),
-                "password": password,
-                "options": {
-                    "data": {
-                        "displayName": displayName.strip()
-                    }
-                }
-            })
-
-            if response.user is None:
-                st.error("Signup did not return a user.")
-            elif response.session is None:
+            status, data = request_supabase(
+                "/auth/v1/signup",
+                method="POST",
+                body={
+                    "email": email.strip(),
+                    "password": password,
+                    "data": {"displayName": displayName.strip()},
+                },
+            )
+            if status >= 400:
+                st.error(data.get("msg", data.get("message", "Signup failed.")))
+            elif not data.get("session"):
                 st.info("Account created. Check your email to confirm it.")
             else:
                 st.success("Account created!")
-
         except Exception as e:
             st.error(f"Signup failed: {e}")
 with st.form("login_form"):
@@ -48,26 +69,30 @@ if login_submitted:
         st.error("Enter your email and password.")
     else:
         try:
-            auth_response = httpx.post(
-                "https://bfjiwafmysriugxmnmbr.supabase.co/auth/v1/token?grant_type=password",
-                headers={
-                    "apikey": "sb_publishable_cAFsSAfXjaeC_JSc0527Rw_I2sPNefR",
-                    "Content-Type": "application/json",
-                },
-                json={
+            status, data = request_supabase(
+                "/auth/v1/token?grant_type=password",
+                method="POST",
+                body={
                     "email": login_email.strip(),
                     "password": login_password,
                 },
             )
-
-            data = auth_response.json()
-
-            if auth_response.status_code != 200:
-                st.error(data.get("error_description", "Invalid email or password."))
+            if status >= 400:
+                st.error(data.get("error_description", data.get("msg", "Invalid email or password.")))
             else:
                 st.session_state["access_token"] = data["access_token"]
+                st.session_state["refresh_token"] = data["refresh_token"]
                 st.session_state["user"] = data["user"]
-                st.success(f"Welcome back, {data['user']['user_metadata']['displayName']}!")
 
+                message_status, messages = request_supabase(
+                    "/rest/v1/messages?select=id,message",
+                    access_token=data["access_token"],
+                )
+                if message_status >= 400:
+                    st.error(messages.get("message", "Login succeeded, but messages could not be loaded."))
+                else:
+                    display_name = data["user"].get("user_metadata", {}).get("displayName", login_email)
+                    st.success(f"Welcome back, {display_name}!")
+                    st.write(messages)
         except Exception as e:
             st.error(f"Login failed: {e}")
