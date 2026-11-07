@@ -16,7 +16,30 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
+st.markdown(
+    """
+    <style>
+    [data-testid="stChatMessage"] {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    /* Constrain chat message area */
+    [data-testid="stChatMessageContainer"] {
+        max-height: 70vh;
+        overflow-y: auto;
+        padding-right: 8px;
+    }
+    .css-1y0tads {padding-top: 0rem;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stApp [data-testid="stToolbar"]{
+    display:none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+    )
 if "screen" not in st.session_state:
     st.session_state["screen"] = "homepage"
 if "target" not in st.session_state:
@@ -300,7 +323,18 @@ elif st.session_state["screen"] == "chat":
             st.markdown(f"**{sender_name}**")
             st.write(msg["message"])
             st.caption(f"Sent at: {timeStr}")
-    message = st.chat_input("Say something")
+    message = st.chat_input("Say something", accept_file = False)
+    st.markdown(
+        """
+        <script>
+        setTimeout(() => {
+            const container = document.querySelector('[data-testid="stChatMessageContainer"]');
+            if (container) container.scrollTop = container.scrollHeight;
+        }, 0);
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
     if message and message.strip():
         writeMessage(message.strip(), current_user_id, target["id"], st.session_state["access_token"])
         st.rerun()
