@@ -1,7 +1,7 @@
 ## Dialogue
 This is an app I made for chatting with other people.
 ### Instructions
-1. Go to [https://s125371.pyscriptapps.com/chat-app/latest/](https://s125371.pyscriptapps.com/chat-app/latest/)
+1. Go to [https://s125371.pyscriptapps.com/dialogue/latest/](https://s125371.pyscriptapps.com/dialogue/latest/)
 2. Signup or login.
 3. Select the user you want to chat with on the contacts screen.
 **IT MAY TAKE A WHILE TO LOAD**
