@@ -1,5 +1,9 @@
 ## Dialogue
 This is an app I made for chatting with other people.
+
+The hardest part was learning how to even get the db to work with my code since it was new to me, but with help from AI, I got it. Then after that, I had to make the messages auto refresh, which took a while to figure out. 
+
+I might add group chat, calling and video chatting somewhere in the future.
 ### Instructions
 1. Go to [https://s125371.pyscriptapps.com/dialogue/latest/](https://s125371.pyscriptapps.com/dialogue/latest/)
 2. Signup or login.
