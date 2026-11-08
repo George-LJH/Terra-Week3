@@ -19,11 +19,6 @@ st.markdown(
         overflow-y: auto;
         padding-right: 8px;
     }
-    .css-1y0tads {padding-top: 0rem;}
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stApp [data-testid="stToolbar"]{
-    display:none;
     }
     </style>
     """,
@@ -85,9 +80,11 @@ async def uploadFile(accessToken, bucket, filePath, fileBytes, contentType):
         "apikey": supabaseKey,
         "Authorization": f"Bearer {accessToken}",
         "Content-Type": contentType,
+        "x-upsert": "true",
     }
     response = await pyfetch(url, method = "POST", headers=headers, body=fileBytes)
-    return response.status, await response.json()
+    responseBody = await response.string()
+    return response.status, json.loads(responseBody) if responseBody else {}
 def writeMessage(message, currentUserId, targetUserId, accessToken, fileInfos=None):
     body = {
         "message": message,
@@ -248,7 +245,7 @@ def login():
                 st.error(f"Login failed: {e}")
 
 if st.session_state["screen"] == "homepage":
-    st.title("Welcome to the Streamlit Supabase App")
+    st.title("Welcome to Dialogue")
     st.write("Please sign up or log in to continue.")
 
     col1, col2 = st.columns(2)
@@ -286,6 +283,7 @@ elif st.session_state["screen"] == "searchUser":
                 list(options),
                 index=None,
                 placeholder="search User...",
+                key="contact_selector",
             )
             if targetName:
                 st.session_state["screen"] = "chat"
@@ -295,13 +293,21 @@ elif st.session_state["screen"] == "searchUser":
         st.error(f"Could not load contacts: {exc}")
 
 elif st.session_state["screen"] == "chat":
-    st_autorefresh(interval=2000, key="msg_poll")
-    
+    with st.sidebar:
+        if st.button("Back to Contacts"):
+            st.session_state.pop("target", None)
+            st.session_state.pop("contact_selector", None)
+            st.session_state["screen"] = "searchUser"
+            st.rerun()
+        if st.button("Refresh Messages"):
+            st.rerun()
+
     target = st.session_state["target"]
     currentUserId = st.session_state["user"]["id"]
+    targetId = target["id"]
     st.title(f"Chat with {target['displayName'] or 'Unnamed user'}")
 
-    messages = readMessages(st.session_state["access_token"], currentUserId, target["id"])
+    messages = readMessages(st.session_state["access_token"], currentUserId, targetId)
     
     # Fetch all profiles to map user IDs to display names
     status, profiles = requestSupabase(
@@ -318,11 +324,10 @@ elif st.session_state["screen"] == "chat":
         dt = datetime.fromisoformat(msg["created_at"])
         timeStr = dt.astimezone().strftime("%Y-%m-%d %I:%M:%S %p")
         # timeStr = dt.strftime("%Y-%m-%d %H:%M:%S")
-        with st.chat_message("user" if isCurrentUser else "assistant"):
+        with st.chat_message("user"):
 
             st.markdown(f"**{senderName}**")
             st.write(msg["message"])
-            st.caption(f"Sent at: {timeStr}")
             for fileInfo in msg.get("files") or []:
                 fileUrl = asyncio.run(
                     createSignedUrl(
@@ -332,46 +337,65 @@ elif st.session_state["screen"] == "chat":
                     )
                 )
 
-                st.markdown(
-                    f"[{fileInfo['name']}]({fileUrl})"
-                )
-    userInput = st.chat_input("Say something", accept_file=True, file_type=["pdf", "png", "jpg", "txt"])
-    if userInput:
-        messageText = userInput.text or ""
-        files = userInput.files or []
-        fileInfos = []
-        for uploadedFile in files:
-            fileBytes = uploadedFile.getvalue()
-            filePath = f"{currentUserId}/{uploadedFile.name}"
-            status, result = asyncio.run(uploadFile(
-                st.session_state["access_token"],
-                "files",
-                filePath,
-                fileBytes,
-                uploadedFile.type or "application/octet-stream",
-            ))
-            if status >= 400:
-                raise RuntimeError(result)
-            fileUrl = (
-                f"{supabaseUrl}/storage/v1/object/public/"
-                f"files/{filePath}"
-            )
-            fileInfos.append({
-                "name": uploadedFile.name,
-                "path": filePath,
-                "type": uploadedFile.type,
-                "size": uploadedFile.size,
-            })
-        if messageText.strip() or files:
+                fileType = fileInfo.get("type", "")
+                if fileType.startswith("image/"):
+                    st.image(fileUrl, caption=fileInfo["name"])
+                elif fileType.startswith("video/"):
+                    st.video(fileUrl)
+                    st.caption(fileInfo['name'])
+                elif fileType.startswith("audio/"):
+                    st.audio(fileUrl)
+                    st.caption(fileInfo['name'])
+                else:
+                    st.markdown(f"[{fileInfo['name']}]({fileUrl})")
+            
+            st.caption(f"Sent at: {timeStr}")
+    userInput = st.chat_input(
+        "Say something",
+        accept_file=True,
+        accept_audio=True,
+        key=f"chat_input_{targetId}",
+    )
+    #, file_type=["pdf", "png", "jpg", "txt"]
+    if userInput is not None:
+        try:
+            messageText = userInput.text or ""
+            files = list(userInput.files or [])
+            fileInfos = []
+            audioFile = userInput.audio
+            if audioFile is not None:
+                files.append(audioFile)
 
-            writeMessage(
-                messageText.strip(),
-                currentUserId,
-                target["id"],
-                st.session_state["access_token"],
-                fileInfos,
-            )
-            st.rerun()
+            for uploadedFile in files:
+                fileBytes = uploadedFile.getvalue()
+                filePath = f"{currentUserId}/{uploadedFile.name}"
+                status, result = asyncio.run(uploadFile(
+                    st.session_state["access_token"],
+                    "files",
+                    filePath,
+                    fileBytes,
+                    uploadedFile.type or "application/octet-stream",
+                ))
+                if status >= 400:
+                    raise RuntimeError(result)
+                fileInfos.append({
+                    "name": uploadedFile.name,
+                    "path": filePath,
+                    "type": uploadedFile.type,
+                    "size": uploadedFile.size,
+                })
+
+            if messageText.strip() or files:
+                writeMessage(
+                    messageText.strip(),
+                    currentUserId,
+                    target["id"],
+                    st.session_state["access_token"],
+                    fileInfos,
+                )
+                st.rerun()
+        except Exception as exc:
+            st.error(f"Could not send file: {exc}")
     st.markdown(
         """
         <script>
@@ -383,3 +407,4 @@ elif st.session_state["screen"] == "chat":
         """,
         unsafe_allow_html=True,
     )
+    st_autorefresh(interval=5000, key=f"msg_poll_{targetId}")
